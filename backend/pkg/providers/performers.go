@@ -736,19 +736,25 @@ func (fp *flowProvider) performSearcher(
 		return "", fmt.Errorf("failed to get task searcher result: %w", err)
 	}
 
+	structuredResult, err := json.Marshal(searchResult)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal structured search result: %w", err)
+	}
+	resultText := string(structuredResult)
+
 	if agentCtx, ok := tools.GetAgentContext(ctx); ok {
 		fp.putAgentLog(
 			ctx,
 			agentCtx.ParentAgentType,
 			agentCtx.CurrentAgentType,
 			question,
-			searchResult.Result,
+			resultText,
 			taskID,
 			subtaskID,
 		)
 	}
 
-	return searchResult.Result, nil
+	return resultText, nil
 }
 
 func (fp *flowProvider) performEnricher(

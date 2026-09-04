@@ -134,8 +134,49 @@ type SearchAction struct {
 }
 
 type SearchResult struct {
-	Result  string `json:"result" jsonschema:"required,title=Search result" jsonschema_description:"Technical-channel payload — fully detailed search report (or error explanation) returned to the calling agent for further reasoning. Always written in English; never translated."`
-	Message string `json:"message" jsonschema:"required,title=Search result message" jsonschema_description:"Engagement-log entry — a 1-2 short sentence running commentary with a short summary of the result. Written in the engagement language declared by your system prompt."`
+	Result   string      `json:"result" jsonschema:"required,title=Search result" jsonschema_description:"Technical-channel payload — concise synthesis of the research and how it changes the attack surface. Do not paste raw terminal or browser output; preserve only facts, references, and decisions. Always written in English; never translated."`
+	Assets   []Asset     `json:"assets" jsonschema:"required,title=Discovered assets" jsonschema_description:"Normalized assets discovered during passive research. Include only confirmed or clearly labeled candidates; do not duplicate an asset."`
+	Services []Service   `json:"services" jsonschema:"required,title=Discovered services" jsonschema_description:"Normalized services associated with assets. Include port, protocol, product/version, state, and evidence reference when known."`
+	Findings []Finding   `json:"findings" jsonschema:"required,title=Research findings" jsonschema_description:"Potential or confirmed findings discovered during research. Use status to distinguish unverified candidates from validated findings; do not claim exploitation without evidence."`
+	Message  string      `json:"message" jsonschema:"required,title=Search result message" jsonschema_description:"Engagement-log entry — a 1-2 short sentence running commentary with a short summary of the result. Written in the engagement language declared by your system prompt."`
+}
+
+// Asset is a normalized host or application identity produced by reconnaissance.
+// It is intentionally tool-agnostic so later agents can reuse it without parsing
+// raw terminal output.
+type Asset struct {
+	ID       string `json:"id" jsonschema:"required" jsonschema_description:"Stable local identifier used to link services and findings, for example asset-1."`
+	Hostname string `json:"hostname,omitempty" jsonschema_description:"Confirmed hostname or DNS name, if available."`
+	Domain   string `json:"domain,omitempty" jsonschema_description:"Confirmed parent domain, if available."`
+	IP       string `json:"ip,omitempty" jsonschema_description:"IP address, if available. Do not include credentials or secrets."`
+	URL      string `json:"url,omitempty" jsonschema_description:"Canonical application URL, if available."`
+	Kind     string `json:"kind" jsonschema:"required,type=string,enum=host,enum=web_app,enum=api,enum=domain,enum=cloud_service,enum=other" jsonschema_description:"Asset category."`
+	State    string `json:"state" jsonschema:"required,type=string,enum=confirmed,enum=candidate,enum=unreachable" jsonschema_description:"Confidence state of the asset identity."`
+	Evidence []string `json:"evidence,omitempty" jsonschema_description:"Short evidence references such as source URLs, scan IDs, or command summaries. Never paste large raw output."`
+}
+
+// Service is a normalized network or application service attached to an Asset.
+type Service struct {
+	AssetID  string   `json:"asset_id" jsonschema:"required" jsonschema_description:"ID of the related Asset."`
+	Port     *int64   `json:"port,omitempty" jsonschema_description:"Numeric port when applicable."`
+	Protocol string    `json:"protocol" jsonschema:"required,type=string,enum=tcp,enum=udp,enum=http,enum=https,enum=other" jsonschema_description:"Transport or application protocol."`
+	Name     string   `json:"name" jsonschema:"required" jsonschema_description:"Service or product name."`
+	Version  string   `json:"version,omitempty" jsonschema_description:"Observed version, if known."`
+	State    string   `json:"state" jsonschema:"required,type=string,enum=confirmed,enum=candidate,enum=closed,enum=filtered" jsonschema_description:"Observed service state."`
+	Evidence []string `json:"evidence,omitempty" jsonschema_description:"Short evidence references; do not paste large raw output."`
+}
+
+// Finding represents a research lead or a verified security finding. Validation
+// is deliberately separate from discovery so Pentester can verify candidates.
+type Finding struct {
+	ID         string   `json:"id" jsonschema:"required" jsonschema_description:"Stable local identifier, for example finding-1."`
+	AssetID    string   `json:"asset_id,omitempty" jsonschema_description:"Related Asset ID, when applicable."`
+	Title      string   `json:"title" jsonschema:"required" jsonschema_description:"Short finding title."`
+	Severity   string   `json:"severity" jsonschema:"required,type=string,enum=info,enum=low,enum=medium,enum=high,enum=critical,enum=unknown" jsonschema_description:"Estimated severity; use unknown when evidence is insufficient."`
+	Confidence string   `json:"confidence" jsonschema:"required,type=string,enum=low,enum=medium,enum=high" jsonschema_description:"Confidence in the finding."`
+	Status     string   `json:"status" jsonschema:"required,type=string,enum=candidate,enum=verified,enum=not_reproducible,enum=false_positive" jsonschema_description:"Verification state. Searcher should normally produce candidate; Pentester may mark verified only with evidence."`
+	Evidence   []string `json:"evidence" jsonschema:"required" jsonschema_description:"Short evidence references supporting the finding. Use an empty array when none is available."`
+	NextStep   string   `json:"next_step,omitempty" jsonschema_description:"Smallest safe next validation step for the Pentester, or empty when no validation is needed."`
 }
 
 type SploitusAction struct {
